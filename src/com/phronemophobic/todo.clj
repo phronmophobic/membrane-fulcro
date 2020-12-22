@@ -456,27 +456,29 @@
            :textarea/font
            :textarea/border?
            :textarea/id]}
-  (my-events
-   (ui/on
-    ::basic/request-focus
-    (fn []
-      [`(request-focus {:focus-id ~[:textarea/id id]})])
-    (basic/textarea-view
-     :cursor cursor
-     :$cursor [:textarea/id id :textarea/cursor]
-     :focus? (= focus [:textarea/id id])
-     :text text
-     :$text [:textarea/id id :textarea/text]
-     :down-pos down-pos
-     :$down-pos [:textarea/id id :textarea/down-pos]
-     :mpos mpos
-     :$mpos [:textarea/id id :textarea/mpos]
-     :select-cursor select-cursor
-     :$select-cursor [:textarea/id id :textarea/select-cursor]
-     :last-click last-click
-     :$last-click [:textarea/id id :textarea/last-click]
-     :font font
-     :border? border?))))
+  (do
+;;    (prn (list "=" focus [:textarea/id id] (= focus [:textarea/id id])) )
+    (my-events
+     (ui/on
+      ::basic/request-focus
+      (fn []
+        [`(request-focus {:focus-id ~[:textarea/id id]})])
+      (basic/textarea-view
+       :cursor cursor
+       :$cursor [:textarea/id id :textarea/cursor]
+       :focus? (= focus [:textarea/id id])
+       :text text
+       :$text [:textarea/id id :textarea/text]
+       :down-pos down-pos
+       :$down-pos [:textarea/id id :textarea/down-pos]
+       :mpos mpos
+       :$mpos [:textarea/id id :textarea/mpos]
+       :select-cursor select-cursor
+       :$select-cursor [:textarea/id id :textarea/select-cursor]
+       :last-click last-click
+       :$last-click [:textarea/id id :textarea/last-click]
+       :font font
+       :border? border?)))))
 
 (def ui-textarea* (comp/factory TextArea))
 (defn ui-textarea [props]
@@ -512,7 +514,6 @@
 (comment
   (quick-view-root! TextAreaRoot {}))
 
-
 (defsc Checkbox [this {:checkbox/keys [id checked?] :as props}]
   {:ident :checkbox/id
    :query [:checkbox/id :checkbox/checked?]
@@ -524,14 +525,55 @@
      [`(toggle-checkbox {:checkbox/id ~id})])
    (ui/checkbox checked?)))
 
+
 (def checkbox-factory (comp/factory Checkbox))
-(defn my-checkbox [props]
+(defn ui-checkbox [props]
   (component->view (checkbox-factory props)))
 #_(let [checkbox-factory (comp/factory Checkbox {:keyfn :checkbox/id})]
     (defn checkbox
 
       [props & {:keys [onSelect kind value stateful?] :as attrs}]
       (ui-dropdown-factory (comp/computed props attrs))))
+
+
+(defsc TodoItem [this {:todo/keys [id checked? description ]
+                       :keys [focus ta]}]
+  {:initial-state (fn [props]
+                    (merge
+                     {:todo/checked? false
+                      :todo/id 1
+                      :todo/description "make coffee"}
+                     props))
+   :use-hooks? true
+   :ident :todo/id
+   :query [:todo/id
+           :todo/checked?
+           :todo/description
+           :ta
+           :focus]}
+  (ui/horizontal-layout
+   (ui/on
+    `toggle-checkbox
+    (fn [_]
+      [`(toggle-todo ~{:todo/id id})])
+    (ui-checkbox {:checked? checked?}))
+   (ui-textarea (merge
+                 ta
+                 {:focus focus
+                  ;;:textarea/text description
+                  }))))
+
+
+(comment
+  (def app
+   (quick-view! TodoItem {:todo/id 1
+                          :todo/checked? true
+                          :todo/description "make a fulcro desktop app"
+                          :focus [:textarea/id 1]
+                          :ta {:textarea/cursor 0
+                               :textarea/border? true
+                               :textarea/id 1
+                               :textarea/text "make fulcro desktop app"}})))
 
 (defn -main [ & args]
   (def test-app
