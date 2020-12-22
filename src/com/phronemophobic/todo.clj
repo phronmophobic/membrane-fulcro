@@ -10,6 +10,7 @@
              [com.fulcrologic.fulcro.algorithms.denormalize :as fdn]
              [membrane.ui :as ui]
              [membrane.basic-components :as basic]
+             membrane.component
              [clojure.zip :as z]
              [membrane.skia :as skia])
   (:gen-class))
@@ -80,7 +81,7 @@
 
 (defn dispatch! [app tx]
   (when (seq tx)
-    (prn "dispatch! "tx)    
+    ;; (prn "dispatch! "tx)    
     (comp/transact! app tx))
   nil)
 
@@ -393,25 +394,60 @@
                                                                                             stateful? (= (::id %) active-item)
                                                                                             value (= value (::id %)))) items)))))))
 
-()
+
+
+
+(defn my-events [body]
+  (let [do-nothing (fn [handler & args]
+                     (let [intents (seq (apply handler args))]
+                       (when intents
+                         (map
+                          (fn [intent]
+                            (if (vector? intent)
+                              (list `membrane-dispatch! {:intent intent})
+                              intent))
+                          intents))
+                       ))]
+    (ui/wrap-on :mouse-down do-nothing
+                :key-press do-nothing
+                :mouse-up do-nothing
+                :mouse-event do-nothing
+                :mouse-move do-nothing
+                body)))
+
+(defmutation membrane-dispatch!
+  "docstring"
+  [{:keys [intent]}]
+  (action [{:keys [state] :as env}]
+          (let [dispatch! (membrane.component/default-handler state)]
+            (apply dispatch! intent))
+          nil
+          #_(swap! state ...)))
+
+(defmutation request-focus
+  "docstring"
+  [{:keys [focus-id]}]
+  (action [{:keys [state] :as env}]
+          (swap! state assoc :focus focus-id)))
 
 (defsc TextArea [ this {:textarea/keys [cursor
-                                        focus?
                                         text
                                         down-pos
                                         mpos
                                         select-cursor
                                         last-click
                                         font
+                                        id
                                         border?]
-                        }]
-  {:initial-state {:textarea/cursor 0
-                   :textarea/text "hello"
-                   :textarea/border? true
-                   :textarea/id 1}
+                        :keys [focus]}]
+  {:initial-state (fn [props]
+                    (merge {:textarea/cursor 0
+                            :textarea/text "hello there"
+                            :textarea/border? true}
+                           props))
    :ident :textarea/id
-   :query [:textarea/cursor
-           :textarea/focus?
+   :query [:focus
+           :textarea/cursor
            :textarea/text
            :textarea/down-pos
            :textarea/mpos
@@ -420,21 +456,61 @@
            :textarea/font
            :textarea/border?
            :textarea/id]}
+  (my-events
+   (ui/on
+    ::basic/request-focus
+    (fn []
+      [`(request-focus {:focus-id ~[:textarea/id id]})])
+    (basic/textarea-view
+     :cursor cursor
+     :$cursor [:textarea/id id :textarea/cursor]
+     :focus? (= focus [:textarea/id id])
+     :text text
+     :$text [:textarea/id id :textarea/text]
+     :down-pos down-pos
+     :$down-pos [:textarea/id id :textarea/down-pos]
+     :mpos mpos
+     :$mpos [:textarea/id id :textarea/mpos]
+     :select-cursor select-cursor
+     :$select-cursor [:textarea/id id :textarea/select-cursor]
+     :last-click last-click
+     :$last-click [:textarea/id id :textarea/last-click]
+     :font font
+     :border? border?))))
 
-  (basic/textarea-view
-   :cursor cursor
-   :focus? focus?
-   :text text
-   :down-pos down-pos
-   :mpos mpos
-   :select-cursor select-cursor
-   :last-click last-click
-   :font font
-   :border? border?)
-  )
+(def ui-textarea* (comp/factory TextArea))
+(defn ui-textarea [props]
+  (component->view (ui-textarea* props)))
 
-(def ui-textarea (comp/factory TextArea))
+(comment
+  (quick-view! TextArea {:textarea/cursor 0
+                         :textarea/text "hello"
+                         :textarea/border? true
+                         :textarea/id 1}))
 
+(defsc TextAreaRoot [this {:keys [textarea1 textarea2 focus]}]
+  {:initial-state (fn [_]
+                    {:textarea1 (comp/get-initial-state TextArea
+                                                        {:textarea/cursor 0
+                                                         :textarea/text "one"
+                                                         :textarea/border? true
+                                                         :textarea/id 1})
+                     :textarea2 (comp/get-initial-state TextArea
+                                                        {:textarea/cursor 0
+                                                         :textarea/text "two"
+                                                         :textarea/border? true
+                                                         :textarea/id 2})
+                     :focus [:textarea/id 1]})
+   :query [{:textarea1 (comp/get-query TextArea)}
+           {:textarea2 (comp/get-query TextArea)}
+           :focus]}
+  (ui/vertical-layout
+   (ui/label "Text Area App")
+   (ui-textarea (merge textarea1 {:focus focus}))
+   (ui-textarea (merge textarea2 {:focus focus}))))
+
+(comment
+  (quick-view-root! TextAreaRoot {}))
 
 
 (defsc Checkbox [this {:checkbox/keys [id checked?] :as props}]
@@ -481,7 +557,6 @@
            :foo]
    :use-hooks? true}
   (do
-    (prn "foo:" foo)
     (ui/vertical-layout
      (my-checkbox (or checkbox1 {:checkbox/id 1}))
      (my-checkbox (or checkbox2 {:checkbox/id 2}))
