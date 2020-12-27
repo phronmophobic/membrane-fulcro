@@ -15,7 +15,7 @@
              [membrane.skia :as skia])
   (:gen-class))
 
-
+(defn uuid [] (.toString (java.util.UUID/randomUUID)))
 
 
 (defn my-optimized-render!
@@ -103,20 +103,18 @@
         (let [steps (membrane.ui/mouse-event root pos button mouse-down? mods)]
           (if (seq steps)
             (dispatch! steps)
-            #_(when mouse-down?
-                (handle-step [:set [:context :focus] nil] emit!)))))
+            (when mouse-down?
+              (dispatch! [(request-focus nil)])))))
       (membrane.ui/on-key-press
        (fn [s]
          (let [steps (membrane.ui/key-press root s)]
            (dispatch! steps)
-           steps)
-         )
+           steps))
        (membrane.ui/on-key-event
         (fn [key scancode action mods]
           (let [steps (membrane.ui/key-event root key scancode action mods)]
             (dispatch! steps)
-            steps)
-          )
+            steps))
         (membrane.ui/on-clipboard-cut
          (fn []
            (let [steps (membrane.ui/clipboard-cut root)]
@@ -205,14 +203,6 @@
           query*
           [this]
           [#:com.phronemophobic.todo{:child (comp/get-query Child)}]),
-        ;; :initial-state
-        ;; (fn
-        ;;   build-initial-state*
-        ;;   [params]
-        ;;   (com.fulcrologic.fulcro.components/make-state-map
-        ;;    {::child child-ident}
-        ;;    #:com.phronemophobic.todo{:child Child}
-        ;;    params))
         :render
         (fn
           render-Root
@@ -224,8 +214,8 @@
              (clojure.core/let
                  [#:com.phronemophobic.todo{:keys [child]}
                   (com.fulcrologic.fulcro.components/props this)]
-               (child-factory child) 
-               #_(child-factory child)))))}]
+               (component->view
+                (child-factory child))))))}]
     (com.fulcrologic.fulcro.components/configure-component!
      "Root2"
      :com.phronemophobic.todo/Root2
@@ -250,7 +240,7 @@
                         (reset! app-view
                                 (fulcro-view
                                  (partial dispatch! root)
-                                 (render-all root))))
+                                 (component->view root))))
          app (app/fulcro-app
               {:optimized-render! my-optimized-render!
                :render-root! render-root!})
@@ -259,8 +249,6 @@
          ]
      (do
        (app/initialize-state! app root)
-       #_(when initialize-state?
-         )
 
        (swap! (::app/runtime-atom app) assoc
               ;; ::mount-node dom-node
@@ -271,9 +259,9 @@
          (comp/transact! app [(list `set-child {:child-ident child-ident})]))
 
        (app/update-shared! app)
-       (indexing/index-root! app)
+       ;; not doing anything right now
+       ;; (indexing/index-root! app)
 
-       ;; (merge/merge! app initial-state []  )
        (app/render! app {:force-root? true})
 
        (skia/run #(deref app-view) {:draw nil})
@@ -299,7 +287,7 @@
                         (reset! app-view
                                 (fulcro-view
                                  (partial dispatch! root)
-                                 (render-all root))))
+                                 (component->view root))))
          app (app/fulcro-app
               {:optimized-render! my-optimized-render!
                :render-root! render-root!})
@@ -314,7 +302,7 @@
               ;; ::mount-node dom-node
               ::app/root-factory root-factory
               ::app/root-class root)
-       (comp/transact! app [(list `merge-state {:new-state initial-state})])
+       ;; (comp/transact! app [(list `merge-state {:new-state initial-state})])
 
        (app/update-shared! app)
        (indexing/index-root! app)
@@ -328,29 +316,14 @@
        app))))
 
 
-
-
-(defsc Todo [this {:todo/keys [id description complete?] :as props}]
-  {:ident :todo/id
-   :query         [:todo/id :todo/description :todo/complete?]
-   ;;:initial-state {:ui/number 0}
-   }
-  (ui/horizontal-layout
-   (ui/checkbox complete?)
-   (ui/label description)))
-
-
-
-
 (defmutation toggle-checkbox
   "docstring"
   [{:checkbox/keys [id]}]
   (action [{:keys [state] :as env}]
           ;; (prn (get-in @state[:checkbox/id :checkbox/checked?]) )
-          (prn @state)
-          (prn "toggling checkbox" id)
-          (swap! state update-in [:checkbox/id id  :checkbox/checked?] not))
-)
+          (swap! state update-in [:checkbox/id id  :checkbox/checked?] not)
+          nil)
+  )
 (def dropdown-table :bootstrap.dropdown/by-id)
 (defn dropdown-ident [id-or-props]
   [dropdown-table (::id id-or-props)]
@@ -358,77 +331,148 @@
       [(:type id-or-props) (::id id-or-props)]
       [dropdown-table id-or-props]))
 
-(comment
-  (defui ^:once Dropdown
-    static prim/IQuery
-    (query [this] [::id ::active-item ::label ::open? {::items (prim/get-query DropdownItem)} :type])
-    static prim/Ident
-    (ident [this props] (dropdown-ident props))
-    Object
-    (render [this]
-            (let [{:keys [::id ::label ::active-item ::items ::open?]} (prim/props this)
-                  {:keys [onSelect kind stateful? value]} (prim/get-computed this)
-                  active-item-label (->> items
-                                         (some #(and (= active-item (::id %)) %))
-                                         ::label)
-                  value-label       (->> items
-                                         (some #(and (= value (::id %)) %))
-                                         ::label)
-                  label             (cond
-                                      (and value value-label) value-label
-                                      (and active-item-label stateful?) active-item-label
-                                      :otherwise label)
-                  onSelect          (fn [item-id]
-                                      (prim/transact! this `[(close-all-dropdowns {}) (set-dropdown-item-active ~{:id id :item-id item-id})])
-                                      (when onSelect (onSelect item-id)))
-                  open-menu         (fn [evt]
-                                      (.stopPropagation evt)
-                                      (prim/transact! this `[(close-all-dropdowns {}) (set-dropdown-open ~{:id id :open? (not open?)})])
-                                      false)]
-              (button-group {:className (if open? "open" "")}
-                            (button {:className (cond-> "dropdown-toggle"
-                                                  kind (str " btn-" (name kind))) :aria-haspopup true :aria-expanded open? :onClick open-menu}
-                                    (tr-unsafe label) " " (dom/span {:className "caret"}))
-                            (dom/ul {:className "dropdown-menu"}
-                                    (map #(ui-dropdown-item % :onSelect onSelect :active? (cond
-                                                                                            stateful? (= (::id %) active-item)
-                                                                                            value (= value (::id %)))) items)))))))
 
 
 
+(defn wrap-mouse-move-global [handler body]
+  (ui/on-mouse-move-global
+   (fn [pos]
+     (handler (fn [pos] (ui/mouse-move-global body pos))
+              pos))
+   body))
 
-(defn my-events [body]
-  (let [do-nothing (fn [handler & args]
-                     (let [intents (seq (apply handler args))]
-                       (when intents
-                         (map
-                          (fn [intent]
-                            (if (vector? intent)
-                              (list `membrane-dispatch! {:intent intent})
-                              intent))
-                          intents))
-                       ))]
-    (ui/wrap-on :mouse-down do-nothing
-                :key-press do-nothing
-                :mouse-up do-nothing
-                :mouse-event do-nothing
-                :mouse-move do-nothing
-                body)))
+(defn wrap-membrane-intents [body]
+  (let [wrapper (fn [handler & args]
+                  (let [intents (seq (apply handler args))]
+                    (when intents
+                      (map
+                       (fn [intent]
+                         (if (vector? intent)
+                           (list `membrane-dispatch! {:intent intent})
+                           intent))
+                       intents))
+                    ))]
+    (wrap-mouse-move-global wrapper
+     (ui/wrap-on :mouse-down wrapper
+                 :key-press wrapper
+                 :mouse-up wrapper
+                 :mouse-event wrapper
+                 :mouse-move wrapper
+                 body))))
+
+
 
 (defmutation membrane-dispatch!
   "docstring"
   [{:keys [intent]}]
   (action [{:keys [state] :as env}]
           (let [dispatch! (membrane.component/default-handler state)]
-            (apply dispatch! intent))
+            (try
+              (apply dispatch! intent)
+              (catch Exception e
+                (prn "could not process " intent))))
           nil
           #_(swap! state ...)))
 
 (defmutation request-focus
   "docstring"
   [{:keys [focus-id]}]
+
   (action [{:keys [state] :as env}]
           (swap! state assoc :focus focus-id)))
+
+
+
+
+(defn fulcroize-membrane-component* [c prefix cname]
+  (let [v (resolve c)
+        ;; args (into {} (map vec (partition 2 (rest form))))
+        fn-meta (meta v)
+
+        arglists (:arglists fn-meta)
+        first-arglist (first arglists)
+        [ampersand arg-map] first-arglist
+
+        args (disj (set (:keys arg-map))
+                   'context)
+        defaults (:or arg-map)
+        defaults (into {} (map (fn [[k v]]
+                                 [(keyword prefix (name k))
+                                  v])
+                               defaults))
+
+        focusable? (contains? args 'focus?)
+        args (disj args 'focus?)
+
+        props {(keyword prefix "keys") (conj (vec args) 'id)}
+        props (if focusable?
+                (assoc props :keys '[focus])
+                props)
+
+        ident (keyword prefix "id")
+        initial-state (assoc defaults
+                             ident `(uuid))
+
+
+        query (mapv (fn [arg]
+                     (keyword prefix (name arg)))
+                   args)
+        query (if focusable?
+                (conj query [:focus '(quote _)])
+                query)
+        query (conj query (keyword prefix "id"))
+
+        call-args (for [arg args]
+                    [(keyword arg) arg])
+        $call-args (for [arg args]
+                     [(keyword (str "$" (name arg)))
+                      [ident `(list '~'keypath ~'id) (keyword prefix (name arg))]])
+
+        all-call-args (sequence cat
+                                (concat call-args
+                                        $call-args) )
+        all-call-args (if focusable?
+                        (concat all-call-args
+                                [:focus? (list '= 'focus [ident 'id])])
+                        all-call-args)
+
+        body `(~c ~@all-call-args)
+        body (if focusable?
+               `(ui/on ::basic/request-focus
+                       (fn []
+                         [(request-focus {:focus-id ~[ident 'id]})])
+                       ~body)
+               body)
+
+        factory-name (symbol (str "ui-" (clojure.string/lower-case (name cname))
+                                  "*"))
+
+        ]
+    `(do
+       (defsc ~cname [ ~'this ~props]
+         {:initial-state
+          ;; defsc requires an initial state function
+          ;; to be a list (and not a seq)
+          ~(list 'fn '[params]
+                 `(merge ~initial-state ~'params))
+          ;; (~'fn [params#]
+          ;;  (merge ~initial-state params#))
+          :ident ~ident
+          :query ~query
+          }
+         (wrap-membrane-intents ~body))
+       (def ~factory-name
+          (comp/factory ~cname))
+       (defn ~(symbol (str "ui-" (clojure.string/lower-case (name cname))))
+         ~'[props]
+         (component->view (~factory-name ~'props))))))
+
+(defmacro fulcroize-membrane-component [c prefix cname]
+  (fulcroize-membrane-component* c prefix cname))
+
+(fulcroize-membrane-component basic/button "button" Button)
+
+(fulcroize-membrane-component basic/textarea-view "textarea" TextArea)
 
 (defsc TextArea [ this {:textarea/keys [cursor
                                         text
@@ -442,11 +486,12 @@
                         :keys [focus]}]
   {:initial-state (fn [props]
                     (merge {:textarea/cursor 0
-                            :textarea/text "hello there"
-                            :textarea/border? true}
+                            :textarea/text ""
+                            :textarea/border? true
+                            :textarea/id (uuid)}
                            props))
    :ident :textarea/id
-   :query [:focus
+   :query [[:focus '_]
            :textarea/cursor
            :textarea/text
            :textarea/down-pos
@@ -457,7 +502,7 @@
            :textarea/border?
            :textarea/id]}
   (do
-;;    (prn (list "=" focus [:textarea/id id] (= focus [:textarea/id id])) )
+    ;; (prn (list "=" focus [:textarea/id id] (= focus [:textarea/id id])) )
     (my-events
      (ui/on
       ::basic/request-focus
@@ -465,18 +510,18 @@
         [`(request-focus {:focus-id ~[:textarea/id id]})])
       (basic/textarea-view
        :cursor cursor
-       :$cursor [:textarea/id id :textarea/cursor]
+       :$cursor [:textarea/id (list 'keypath id) :textarea/cursor]
        :focus? (= focus [:textarea/id id])
        :text text
-       :$text [:textarea/id id :textarea/text]
+       :$text [:textarea/id (list 'keypath id) :textarea/text]
        :down-pos down-pos
-       :$down-pos [:textarea/id id :textarea/down-pos]
+       :$down-pos [:textarea/id (list 'keypath id) :textarea/down-pos]
        :mpos mpos
-       :$mpos [:textarea/id id :textarea/mpos]
+       :$mpos [:textarea/id (list 'keypath id) :textarea/mpos]
        :select-cursor select-cursor
-       :$select-cursor [:textarea/id id :textarea/select-cursor]
+       :$select-cursor [:textarea/id (list 'keypath id) :textarea/select-cursor]
        :last-click last-click
-       :$last-click [:textarea/id id :textarea/last-click]
+       :$last-click [:textarea/id (list 'keypath id) :textarea/last-click]
        :font font
        :border? border?)))))
 
@@ -488,28 +533,25 @@
   (quick-view! TextArea {:textarea/cursor 0
                          :textarea/text "hello"
                          :textarea/border? true
-                         :textarea/id 1}))
+                         :textarea/id 1})
+  ,)
 
-(defsc TextAreaRoot [this {:keys [textarea1 textarea2 focus]}]
+(defsc TextAreaRoot [this {:keys [textarea1 textarea2 ]}]
   {:initial-state (fn [_]
                     {:textarea1 (comp/get-initial-state TextArea
-                                                        {:textarea/cursor 0
-                                                         :textarea/text "one"
-                                                         :textarea/border? true
-                                                         :textarea/id 1})
+                                                        {:textarea/text "one"
+                                                         :textarea/id (uuid)})
                      :textarea2 (comp/get-initial-state TextArea
-                                                        {:textarea/cursor 0
-                                                         :textarea/text "two"
-                                                         :textarea/border? true
-                                                         :textarea/id 2})
-                     :focus [:textarea/id 1]})
+                                                        {:textarea/text "two"
+                                                         :textarea/id (uuid)})})
    :query [{:textarea1 (comp/get-query TextArea)}
-           {:textarea2 (comp/get-query TextArea)}
-           :focus]}
+           {:textarea2 (comp/get-query TextArea)}]}
   (ui/vertical-layout
    (ui/label "Text Area App")
-   (ui-textarea (merge textarea1 {:focus focus}))
-   (ui-textarea (merge textarea2 {:focus focus}))))
+   (ui-textarea textarea1)
+   (ui-textarea textarea2)))
+
+(def ui-textarearoot (comp/factory TextAreaRoot))
 
 (comment
   (quick-view-root! TextAreaRoot {}))
@@ -517,63 +559,136 @@
 (defsc Checkbox [this {:checkbox/keys [id checked?] :as props}]
   {:ident :checkbox/id
    :query [:checkbox/id :checkbox/checked?]
+   :initial-state (fn [params]
+                    (merge
+                     {:checked? false
+                      :id (uuid)}
+                     params))
    :use-hooks? true}
 
   (ui/on
    :mouse-down
    (fn [_]
-     [`(toggle-checkbox {:checkbox/id ~id})])
+     [(toggle-checkbox {:checkbox/id id})])
    (ui/checkbox checked?)))
 
 
 (def checkbox-factory (comp/factory Checkbox))
 (defn ui-checkbox [props]
   (component->view (checkbox-factory props)))
-#_(let [checkbox-factory (comp/factory Checkbox {:keyfn :checkbox/id})]
-    (defn checkbox
 
-      [props & {:keys [onSelect kind value stateful?] :as attrs}]
-      (ui-dropdown-factory (comp/computed props attrs))))
 
+(defmutation toggle-todo
+  "docstring"
+  [{:todo/keys [id] :as arg}]
+  (action [{:keys [state] :as env}]
+          ;; (prn (get-in @state  [:todo/id]) )
+          (swap! state update-in [:todo/id id :todo/checked?] not)
+
+          nil)
+  )
+
+(defmutation update-todo-description
+  ""
+  [{todo-id :todo/id
+    textarea-id :textarea/id}]
+  (action [{:keys [state] :as env}]
+          (swap! state
+                   (fn [state]
+                   (let [new-description (get-in state [:textarea/id textarea-id :textarea/text])]
+                     (assoc-in state [:todo/id todo-id :todo/description] new-description))))
+
+
+          nil))
 
 (defsc TodoItem [this {:todo/keys [id checked? description ]
-                       :keys [focus ta]}]
-  {:initial-state (fn [props]
-                    (merge
-                     {:todo/checked? false
-                      :todo/id 1
-                      :todo/description "make coffee"}
-                     props))
+                       :keys [ta cb]
+                       :as props}]
+  {:initial-state (fn [params]
+                    (let [tid (get params :todo/id (uuid))]
+                     (merge
+                      {:todo/checked? false
+                       :todo/id tid
+                       :todo/description ""
+                       :ta (comp/get-initial-state TextArea {:textarea/id [::todo-item tid]})
+                       :cb (comp/get-initial-state Checkbox {:checkbox/id [::todo-item tid]})}
+                      params)))
    :use-hooks? true
    :ident :todo/id
    :query [:todo/id
            :todo/checked?
            :todo/description
-           :ta
-           :focus]}
+           {:cb (comp/get-query Checkbox)}
+           {:ta (comp/get-query TextArea)}]}
   (ui/horizontal-layout
    (ui/on
     `toggle-checkbox
-    (fn [_]
-      [`(toggle-todo ~{:todo/id id})])
-    (ui-checkbox {:checked? checked?}))
-   (ui-textarea (merge
-                 ta
-                 {:focus focus
-                  ;;:textarea/text description
-                  }))))
+    (fn [checkbox-id]
+      [ ;; (toggle-todo nil)
+       (toggle-checkbox checkbox-id)
+       (toggle-todo {:todo/id id})])
+    (ui-checkbox cb))
+   (ui/on-bubble
+    (fn [intents]
+
+      (when (seq intents)
+        (concat intents
+                [(update-todo-description {:todo/id id
+                                           :textarea/id (:textarea/id ta)})])))
+    (ui-textarea ta))))
+
+
+
+
+
+(def todo-item-factory (comp/factory TodoItem))
+(defn ui-todo-item [props]
+  (component->view (todo-item-factory props)))
 
 
 (comment
   (def app
-   (quick-view! TodoItem {:todo/id 1
-                          :todo/checked? true
-                          :todo/description "make a fulcro desktop app"
-                          :focus [:textarea/id 1]
-                          :ta {:textarea/cursor 0
-                               :textarea/border? true
-                               :textarea/id 1
-                               :textarea/text "make fulcro desktop app"}})))
+    (quick-view! TodoItem (comp/get-initial-state TodoItem)))
+  ,)
+
+(defmutation add-todo
+  "docstring"
+  [{id :todo-list/id}]
+  (action [{:keys [app state] :as env}]
+          (let [tid (uuid)]
+            ;; (prn (get-in @state[:checkbox/id :checkbox/checked?]) )
+            (merge/merge-component! app TodoItem (comp/get-initial-state TodoItem {:todo/id tid}))
+            (swap! state update-in [:todo-list/id id :todo-list/todo-list] conj [:todo/id tid]))
+          nil))
+
+(defsc TodoList [this {:todo-list/keys [id todo-list button]}]
+  { ;;:initial-state
+   :ident :todo-list/id
+   :initial-state (fn [params]
+                    (merge
+                     {:todo-list/id (uuid)
+                      :todo-list/todo-list []
+                      :todo-list/button (comp/get-initial-state Button
+                                                                {:button/text "Add Todo"})}
+                     params))
+   :use-hooks? true
+   :query [{:todo-list/todo-list (comp/get-query TodoItem)}
+           {:todo-list/button (comp/get-query Button)}
+           :todo-list/id]}
+  (apply
+   ui/vertical-layout
+   (ui/on
+    :request-focus
+    (fn [])
+    :mouse-down
+          (fn [_]
+            [(add-todo {:todo-list/id id})])
+          (ui-button button))
+   (map ui-todo-item todo-list)))
+
+(comment
+  (def app (quick-view! TodoList (comp/get-initial-state TodoList {:todo-list/id (uuid)})))
+  ,)
 
 (defn -main [ & args]
   (def test-app
@@ -636,11 +751,3 @@
 
 
 
-
-
-
-(defsc Thing [this {:keys [x]}]
-  {:query [:x]}
-  nil)
-
-(def ui-thing-1 (comp/factory Thing {:qualifier :x}))
