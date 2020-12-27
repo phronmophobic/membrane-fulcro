@@ -8,6 +8,7 @@
              [com.fulcrologic.fulcro.inspect.inspect-client :as inspect]
              [com.fulcrologic.fulcro.algorithms.merge :as merge]
              [com.fulcrologic.fulcro.algorithms.denormalize :as fdn]
+             [com.fulcrologic.fulcro.algorithms.tx-processing.synchronous-tx-processing :as stx]
              [membrane.ui :as ui]
              [membrane.basic-components :as basic]
              membrane.component
@@ -241,9 +242,10 @@
                                 (fulcro-view
                                  (partial dispatch! root)
                                  (component->view root))))
-         app (app/fulcro-app
-              {:optimized-render! my-optimized-render!
-               :render-root! render-root!})
+         app (stx/with-synchronous-transactions
+               (app/fulcro-app
+                {:optimized-render! my-optimized-render!
+                 :render-root! render-root!}))
          root (make-root comp initial-state)
          root-factory (comp/factory root)
          ]
@@ -288,9 +290,10 @@
                                 (fulcro-view
                                  (partial dispatch! root)
                                  (component->view root))))
-         app (app/fulcro-app
-              {:optimized-render! my-optimized-render!
-               :render-root! render-root!})
+         app (stx/with-synchronous-transactions
+               (app/fulcro-app
+                {:optimized-render! my-optimized-render!
+                 :render-root! render-root!}))
          root comp
          root-factory (comp/factory root)
          ]
