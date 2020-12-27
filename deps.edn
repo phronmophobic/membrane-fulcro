@@ -1,6 +1,7 @@
 {:paths ["src" "resources"]
  :deps {org.clojure/clojure {:mvn/version "1.10.1"}
         com.fulcrologic/fulcro {:mvn/version "3.4.10"}
+        com.googlecode.lanterna/lanterna {:mvn/version "3.0.2"}
         com.phronemophobic/membrane {:mvn/version "0.9.17-beta-SNAPSHOT"}}
  :aliases
  {:test {:extra-paths ["test"]

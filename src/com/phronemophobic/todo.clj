@@ -12,14 +12,18 @@
              [membrane.ui :as ui]
              [membrane.basic-components :as basic]
              membrane.component
-             [clojure.zip :as z]
+             [com.phronemophobic.fulcro :as f
+              :refer [uuid
+                      component->view
+                      show!
+                      show-sync!]]
              [membrane.skia :as skia])
   (:gen-class))
 
-(defn uuid [] (.toString (java.util.UUID/randomUUID)))
+;; (defn uuid [] (.toString (java.util.UUID/randomUUID)))
 
 
-(defn my-optimized-render!
+#_(defn my-optimized-render!
   "Render the UI. The keyframe render runs a full UI query and then asks React to render the root component.
   The optimizations for this kind of render are purely those provided by `defsc`'s default
   shouldComponentUpdate, which causes component to act like React PureComponent (though the props compare in cljs
@@ -47,26 +51,26 @@
       app-root)))
 
 
-(defn component->view [component]
+#_(defn component->view [component]
   (let [opts (comp/component-options component)
         render (:render opts)]
     (render component)))
 
 
-(defmutation request-focus
+#_(defmutation request-focus
   "docstring"
   [{:keys [focus-id]}]
 
   (action [{:keys [state] :as env}]
           (swap! state assoc :focus focus-id)))
 
-(defn dispatch! [app tx]
+#_(defn dispatch! [app tx]
   (when (seq tx)
     ;; (prn "dispatch! "tx)    
     (comp/transact! app tx))
   nil)
 
-(defn fulcro-view [dispatch! root]
+#_(defn fulcro-view [dispatch! root]
   (membrane.ui/on-scroll
    (fn [offset mpos]
      (let [steps (membrane.ui/scroll root offset mpos)]
@@ -113,7 +117,7 @@
                steps))
            root))))))))))
 
-(defn my-mount!
+#_(defn my-mount!
   "Mount the app.  If called on an already-mounted app this will have the effect of re-installing the root node so that
   hot code reload will refresh the UI (useful for development).
 
@@ -160,7 +164,7 @@
   {:query [{::child (comp/get-query Child)}]}
   (component->view (component->view (child-factory child))))
 
-(defn make-root [Child initial-state]
+#_(defn make-root [Child initial-state]
   (clojure.core/let
       [child-factory (comp/factory Child)
        child-ident (comp/ident Child initial-state)
@@ -170,7 +174,7 @@
         (fn
           query*
           [this]
-          [#:com.phronemophobic.todo{:child (comp/get-query Child)}]),
+          [{::child (comp/get-query Child)}]),
         :render
         (fn
           render-Root
@@ -180,23 +184,23 @@
            (clojure.core/fn
              []
              (clojure.core/let
-                 [#:com.phronemophobic.todo{:keys [child]}
+                 [{::keys [child]}
                   (com.fulcrologic.fulcro.components/props this)]
                (component->view
                 (child-factory child))))))}]
     (com.fulcrologic.fulcro.components/configure-component!
      "Root2"
-     :com.phronemophobic.todo/Root2
+     ::Root2
      options__26421__auto__)))
 
-(defmutation set-child
+#_(defmutation set-child
   "docstring"
   [{:keys [child-ident]}]
   (action [{:keys [state] :as env}]
           (swap! state assoc ::child child-ident)
           nil))
 
-(defn quick-view!
+#_(defn show!
   "Pop up a window of the component with the state"
 
   ([comp initial-state] ;;[app root node {:keys [initialize-state? hydrate?]}]
@@ -235,7 +239,7 @@
        app))))
 
 
-(defmutation merge-state
+#_(defmutation merge-state
   "docstring"
   [{new-state :new-state}]
   (action [{:keys [state] :as env}]
@@ -244,7 +248,7 @@
           (swap! state merge new-state))
 )
 
-(defn quick-view-root!
+#_(defn quick-view-root!
   "Pop up a window of the component with the state"
 
   ([comp initial-state] ;;[app root node {:keys [initialize-state? hydrate?]}]
@@ -284,14 +288,14 @@
        app))))
 
 
-(defn wrap-mouse-move-global [handler body]
+#_(defn wrap-mouse-move-global [handler body]
   (ui/on-mouse-move-global
    (fn [pos]
      (handler (fn [pos] (ui/mouse-move-global body pos))
               pos))
    body))
 
-(defn wrap-membrane-intents [body]
+#_(defn wrap-membrane-intents [body]
   (let [wrapper (fn [handler & args]
                   (let [intents (seq (apply handler args))]
                     (when intents
@@ -311,7 +315,7 @@
 
 
 
-(defmutation membrane-dispatch!
+#_(defmutation membrane-dispatch!
   "docstring"
   [{:keys [intent]}]
   (action [{:keys [state] :as env}]
@@ -328,7 +332,7 @@
 
 
 
-(defn fulcroize-membrane-component* [c prefix cname]
+#_(defn fulcroize-membrane-component* [c prefix cname]
   (let [v (resolve c)
         ;; args (into {} (map vec (partition 2 (rest form))))
         fn-meta (meta v)
@@ -411,15 +415,15 @@
          ~'[props]
          (component->view (~factory-name ~'props))))))
 
-(defmacro fulcroize-membrane-component [c prefix cname]
+#_(defmacro fulcroize-membrane-component [c prefix cname]
   (fulcroize-membrane-component* c prefix cname))
 
-(fulcroize-membrane-component basic/button "button" Button)
+(f/fulcroize-membrane-component basic/button "button" Button)
 
-(fulcroize-membrane-component basic/textarea-view "textarea" TextArea)
+(f/fulcroize-membrane-component basic/textarea-view "textarea" TextArea)
 
 
-(fulcroize-membrane-component basic/checkbox "checkbox" Checkbox)
+(f/fulcroize-membrane-component basic/checkbox "checkbox" Checkbox)
 
 
 (defmutation toggle-todo
@@ -478,9 +482,6 @@
     (ui-textarea todo-textarea))))
 
 
-
-
-
 (def todo-item-factory (comp/factory TodoItem))
 (defn ui-todo-item [props]
   (component->view (todo-item-factory props)))
@@ -488,7 +489,7 @@
 
 (comment
   (def app
-    (quick-view! TodoItem (comp/get-initial-state TodoItem)))
+    (show! TodoItem (comp/get-initial-state TodoItem)))
   ,)
 
 (defmutation add-todo
@@ -531,46 +532,30 @@
            {:todo-list/button (comp/get-query Button)}
            {:todo-list/new-todo-textarea (comp/get-query TextArea)}
            :todo-list/id]}
-  (apply
-   ui/vertical-layout
-   (ui/horizontal-layout
-    (ui/on
-     :mouse-down
-     (fn [_]
-       [(add-todo {:todo-list/id id
-                   :todo/description (:textarea/text new-todo-textarea)})
-        (clear-textarea {:textarea/id (:textarea/id new-todo-textarea)})
-        ])
-     (ui-button button))
-    (ui-textarea new-todo-textarea))
-   (map ui-todo-item todo-list)))
+  (do
+    (apply
+     ui/vertical-layout
+     (ui/horizontal-layout
+      (ui/on
+       :mouse-down
+       (fn [_]
+         [(add-todo {:todo-list/id id
+                     :todo/description (:textarea/text new-todo-textarea)})
+          (clear-textarea {:textarea/id (:textarea/id new-todo-textarea)})
+          ])
+       (ui-button button))
+      (ui-textarea new-todo-textarea))
+     (map ui-todo-item todo-list))))
 
 (comment
-  (def app (quick-view! TodoList (comp/get-initial-state TodoList {:todo-list/id (uuid)})))
+  (def app (show! TodoList (comp/get-initial-state TodoList {:todo-list/id (uuid)})))
   ,)
 
 (defn -main [ & args]
-  (def test-app
-    (quick-view! Checkbox {:checkbox/id 1
-                           :checkbox/checked? true})))
+  (def app (show-sync! TodoList (comp/get-initial-state TodoList {:todo-list/id (uuid)})))
+  )
 
 
-;; cheat sheet
-(comment
-
-  ;; get app state
-  (app/current-state app)
-
-  ;; add an instance
-  (merge/merge-component! app Root {:ui/number -1})
-
-  ;; get query (comp/get-query root-class state-map)
-  (comp/get-query Todo)
-
-  ;; query the tree?
-  (com.fulcrologic.fulcro.algorithms.denormalize/db->tree query state state)
-
-  ,)
 
 
 
