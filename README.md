@@ -1,14 +1,8 @@
 # membrane-fulcro
 
-A proof of concent of using fulcro to build Desktop and Terminal applications
-
-## Installation
-
-Download from https://github.com/com.phronemophobic/membrane-fulcro
+A proof of concept using fulcro to build desktop and terminal applications
 
 ## Usage
-
-Run the project directly:
 
 Run the desktop app:
     
