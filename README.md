@@ -1,6 +1,6 @@
 # membrane-fulcro
 
-FIXME: my new application.
+A proof of concent of using fulcro to build Desktop and Terminal applications
 
 ## Installation
 
@@ -8,43 +8,30 @@ Download from https://github.com/com.phronemophobic/membrane-fulcro
 
 ## Usage
 
-FIXME: explanation
-
 Run the project directly:
 
-    $ clojure -M -m com.phronemophobic.membrane-fulcro
+Run the desktop app:
+    
+```
+$ clj -M -m com.phronemophobic.todo
+```
 
-Run the project's tests (they'll fail until you edit them):
+![desktop todo](/membrane-fulcro-desktop-todo.gif?raw=true)
 
-    $ clojure -M:test:runner
 
-Build an uberjar:
+Run the terminal app:
 
-    $ clojure -M:uberjar
+```
+;; don't use clj which uses rlwrap!
+$ clojure -J -M -m com.phronemophobic.todo-terminal
+```
 
-Run that uberjar:
+![terminal todo](/membrane-fulcro-terminal-todo.gif?raw=true)
 
-    $ java -jar membrane-fulcro.jar
-
-## Options
-
-FIXME: listing of options this app accepts.
-
-## Examples
-
-...
-
-### Bugs
-
-...
-
-### Any Other Sections
-### That You Think
-### Might be Useful
 
 ## License
 
-Copyright © 2020 Adrian
+Copyright © 2020 Adrian Smith
 
 Distributed under the Eclipse Public License either version 1.0 or (at
 your option) any later version.
