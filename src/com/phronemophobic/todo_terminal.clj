@@ -13,7 +13,7 @@
              [membrane.basic-components :as basic]
              membrane.component
              [clojure.zip :as z]
-             [com.phronemophobic.fulcro :as f
+             [membrane.fulcro :as mf
               :refer [uuid
                       component->view
                       show!
@@ -24,8 +24,8 @@
 (defn log [& msgs]
   (spit "lanterna.log" (str (clojure.string/join " " msgs) "\n") :append true))
 
-(f/fulcroize-membrane-component lanterna/textarea-view "textarea" TextArea)
-(f/fulcroize-membrane-component lanterna/checkbox "checkbox" Checkbox)
+(mf/fulcroize-membrane-component lanterna/textarea-view "textarea" TextArea)
+(mf/fulcroize-membrane-component lanterna/checkbox "checkbox" Checkbox)
 
 
 (defmutation toggle-todo
@@ -49,19 +49,48 @@
 
           nil))
 
+(declare TodoItem)
+(defmutation add-todo
+  "docstring"
+  [{id :todo-list/id
+    todo-description :todo/description}]
+  (action [{:keys [app state] :as env}]
+          (let [tid (uuid)]
+            ;; (prn (get-in @state[:checkbox/id :checkbox/checked?]) )
+            (merge/merge-component! app TodoItem (comp/get-initial-state TodoItem {:todo/id tid
+                                                                                   :todo/description todo-description}))
+            (swap! state update-in [:todo-list/id id :todo-list/todo-list] conj [:todo/id tid]))
+          nil))
+
+
+(defmutation delete-todo
+  "docstring"
+  [m]
+  (action [{:keys [app state] :as env}]
+          (let [tid (uuid)]
+            ;; (prn (get-in @state[:checkbox/id :checkbox/checked?]) )
+            (swap! state merge/remove-ident*
+                   [:todo/id (:todo/id m)]
+                   [:todo-list/id (:todo-list/id m) :todo-list/todo-list]))
+          nil))
+
+(defn delete-X []
+  (ui/with-color [1 0 0]
+    (lanterna/label "X")))
+
 (defsc TodoItem [this {:todo/keys [id checked? description ]
                        :keys [todo-textarea todo-checkbox]
                        :as props}]
   {:initial-state (fn [params]
                     (let [tid (get params :todo/id (uuid))]
-                     (merge
-                      {:todo/checked? false
-                       :todo/id tid
-                       :todo/description ""
-                       :todo-textarea (comp/get-initial-state TextArea {:textarea/id [::todo-item tid]
-                                                             :textarea/text (get params :todo/description "")})
-                       :todo-checkbox (comp/get-initial-state Checkbox {:checkbox/id [::todo-item tid]})}
-                      params)))
+                      (merge
+                       {:todo/checked? false
+                        :todo/id tid
+                        :todo/description ""
+                        :todo-textarea (comp/get-initial-state TextArea {:textarea/id [::todo-item tid]
+                                                                         :textarea/text (get params :todo/description "")})
+                        :todo-checkbox (comp/get-initial-state Checkbox {:checkbox/id [::todo-item tid]})}
+                       params)))
    :ident :todo/id
    :query [:todo/id
            :todo/checked?
@@ -69,6 +98,11 @@
            {:todo-checkbox (comp/get-query Checkbox)}
            {:todo-textarea (comp/get-query TextArea)}]}
   (ui/horizontal-layout
+   (ui/on
+    :mouse-down
+    (fn [_]
+      [(delete-todo {:todo/id id})])
+    (delete-X))
    (ui/on-bubble
     (fn [intents]
       (when (seq intents)
@@ -88,17 +122,7 @@
 (defn ui-todo-item [props]
   (component->view (todo-item-factory props)))
 
-(defmutation add-todo
-  "docstring"
-  [{id :todo-list/id
-    todo-description :todo/description}]
-  (action [{:keys [app state] :as env}]
-          (let [tid (uuid)]
-            ;; (prn (get-in @state[:checkbox/id :checkbox/checked?]) )
-            (merge/merge-component! app TodoItem (comp/get-initial-state TodoItem {:todo/id tid
-                                                                                   :todo/description todo-description}))
-            (swap! state update-in [:todo-list/id id :todo-list/todo-list] conj [:todo/id tid]))
-          nil))
+
 
 
 (defmutation clear-textarea
@@ -137,15 +161,21 @@
         ])
      (lanterna/button "Add Todo"))
     (ui-textarea new-todo-textarea))
-   (map ui-todo-item todo-list)))
+   (map (fn [item]
+          (ui/on
+           `delete-todo
+           (fn [m]
+             [(delete-todo (assoc m :todo-list/id id))])
+           (ui-todo-item item)))
+        todo-list)))
 
 
 (defn run-terminal!
   ([root initial-state]
-   (let [{:keys [app view-atom]} (f/mount! root)]
+   (let [{:keys [app view-atom]} (mf/mount! root)]
      (merge/merge-component! app root initial-state)
      (let [child-ident (comp/ident root initial-state)]
-       (comp/transact! app [(f/set-child {:child-ident child-ident})])
+       (comp/transact! app [(mf/set-child {:child-ident child-ident})])
        (app/render! app {:force-root? true})
 
        (lanterna/run-sync #(deref view-atom))
