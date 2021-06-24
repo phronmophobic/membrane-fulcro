@@ -17,7 +17,7 @@ Run the terminal app:
 
 ```
 ;; don't use clj which uses rlwrap!
-$ clojure -J -M -m com.phronemophobic.todo-terminal
+$ clojure -M -m com.phronemophobic.todo-terminal
 ```
 
 ![terminal todo](/membrane-fulcro-terminal-todo.gif?raw=true)
