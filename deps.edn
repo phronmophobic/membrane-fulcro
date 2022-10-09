@@ -1,8 +1,8 @@
 {:paths ["src" "resources"]
  :deps {org.clojure/clojure {:mvn/version "1.10.3"}
-        com.fulcrologic/fulcro {:mvn/version "3.5.8"}
+        com.fulcrologic/fulcro {:mvn/version "3.5.28"}
         com.googlecode.lanterna/lanterna {:mvn/version "3.1.1"}
-        com.phronemophobic/membrane {:mvn/version "0.9.31.1-beta"}
+        com.phronemophobic/membrane {:mvn/version "0.10.0-beta"}
 
         ;; for desktop
         com.phronemophobic.membrane/skialib-macosx-x86-64 {:mvn/version "0.9.31.0-beta"}
